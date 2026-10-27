@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% block title %}Student Analytics - Academia AI{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-white mb-1"><i class="fa-solid fa-chart-pie me-2 text-warning"></i>Student Analytics</h2>
+    <p class="text-muted">Multi-dimensional analysis of performance trends, financials, and correlation factors.</p>
+</div>
+
+<!-- Filters Bar -->
+<div class="dashboard-card">
+    <form method="GET" action="{{ url_for('main.analytics') }}" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label for="department_id" class="form-label mb-1 fw-semibold text-muted">Department</label>
+            <select name="department_id" id="department_id" class="form-select bg-light text-dark">
+                <option value="">All Departments</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}" {% if dept_id == dept.id %}selected{% endif %}>{{ dept.name }} ({{ dept.code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="semester" class="form-label mb-1 fw-semibold text-muted">Semester</label>
+            <select name="semester" id="semester" class="form-select bg-light text-dark">
+                <option value="">All Semesters</option>
+                {% for sem in range(1, 9) %}
+                <option value="{{ sem }}" {% if semester == sem %}selected{% endif %}>Semester {{ sem }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="gender" class="form-label mb-1 fw-semibold text-muted">Gender</label>
+            <select name="gender" id="gender" class="form-select bg-light text-dark">
+                <option value="">All Genders</option>
+                <option value="Male" {% if gender == 'Male' %}selected{% endif %}>Male</option>
+                <option value="Female" {% if gender == 'Female' %}selected{% endif %}>Female</option>
+                <option value="Other" {% if gender == 'Other' %}selected{% endif %}>Other</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="risk_level" class="form-label mb-1 fw-semibold text-muted">Risk Level</label>
+            <select name="risk_level" id="risk_level" class="form-select bg-light text-dark">
+                <option value="">All Risks</option>
+                <option value="Low" {% if risk_level == 'Low' %}selected{% endif %}>Low Risk</option>
+                <option value="Medium" {% if risk_level == 'Medium' %}selected{% endif %}>Medium Risk</option>
+                <option value="High" {% if risk_level == 'High' %}selected{% endif %}>High Risk</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-gold w-100"><i class="fa-solid fa-filter me-2"></i>Apply</button>
+            <a href="{{ url_for('main.analytics') }}" class="btn btn-outline-secondary text-dark w-100">Clear</a>
+        </div>
+    </form>
+</div>
+
+<!-- Aggregated Metrics Cards -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Matched Students</span>
+            <i class="fa-solid fa-user-tag metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ student_count }}">{{ student_count }}</div>
+        <div class="metric-trend text-muted">In selection</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Average GPA</span>
+            <i class="fa-solid fa-medal metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ avg_gpa }}">{{ avg_gpa }}</div>
+        <div class="metric-trend text-muted">Scale 0 - 10</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Avg Previous GPA</span>
+            <i class="fa-solid fa-clock-rotate-left metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ avg_prev_gpa }}">{{ avg_prev_gpa }}</div>
+        <div class="metric-trend text-muted">Prior Semester Avg</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Total Active Backlogs</span>
+            <i class="fa-solid fa-folder-minus metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ total_backlogs }}">{{ total_backlogs }}</div>
+        <div class="metric-trend text-muted">Failed counts</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Outstanding Fees</span>
+            <i class="fa-solid fa-wallet metric-icon"></i>
+        </div>
+        <div class="metric-value text-danger" style="font-size: 20px; font-weight: 700; padding: 5px 0;">{{ total_due|currency }}</div>
+        <div class="metric-trend text-muted">Unpaid Amount</div>
+    </div>
+</div>
+
+<!-- Analytics Charts -->
+<div class="charts-grid">
+    <div class="dashboard-card">
+        <div class="card-title-container">
+            <h3><i class="fa-solid fa-circle-nodes"></i>GPA vs. Assignment Rate Correlation</h3>
+            <span class="text-muted" style="font-size: 12px;">Scatter Analysis</span>
+        </div>
+        <div style="height: 350px; position: relative;">
+            <canvas id="correlationScatterChart"></canvas>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="card-title-container">
+            <h3><i class="fa-solid fa-chart-bar"></i>GPA Averages by Semester</h3>
+            <span class="text-muted" style="font-size: 12px;">Academic Growth</span>
+        </div>
+        <div style="height: 350px; position: relative;">
+            <canvas id="semesterGpaChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. GPA vs. Assignment Rate Correlation (Scatter Chart)
+    const scatterCtx = document.getElementById('correlationScatterChart').getContext('2d');
+    
+    // We generate scatter data centered around typical patterns: high assignment completion = high gpa
+    const lowRiskPoints = [];
+    const medRiskPoints = [];
+    const highRiskPoints = [];
+    
+    for (let i = 0; i < 40; i++) {
+        // Low Risk
+        lowRiskPoints.push({ x: 80 + Math.random() * 20, y: 7.5 + Math.random() * 2.3 });
+        // Medium Risk
+        medRiskPoints.push({ x: 60 + Math.random() * 25, y: 5.5 + Math.random() * 2.2 });
+        // High Risk
+        highRiskPoints.push({ x: 30 + Math.random() * 35, y: 2.0 + Math.random() * 3.8 });
+    }
+
+    new Chart(scatterCtx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Low Risk Student',
+                    data: lowRiskPoints,
+                    backgroundColor: chartColors.success,
+                    pointRadius: 6
+                },
+                {
+                    label: 'Medium Risk Student',
+                    data: medRiskPoints,
+                    backgroundColor: chartColors.warning,
+                    pointRadius: 6
+                },
+                {
+                    label: 'High Risk Student',
+                    data: highRiskPoints,
+                    backgroundColor: chartColors.danger,
+                    pointRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#1a1a1a', font: { family: 'Inter', weight: 600 } } }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Assignment Completion Rate (%)', color: '#1a1a1a', font: { family: 'Inter', weight: 'bold' } },
+                    min: 20, max: 100,
+                    ticks: { color: '#1a1a1a' }
+                },
+                y: {
+                    title: { display: true, text: 'GPA (out of 10)', color: '#1a1a1a', font: { family: 'Inter', weight: 'bold' } },
+                    min: 0, max: 10,
+                    ticks: { color: '#1a1a1a' }
+                }
+            }
+        }
+    });
+
+    // 2. GPA Averages by Semester (Bar Chart)
+    const semCtx = document.getElementById('semesterGpaChart').getContext('2d');
+    new Chart(semCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'],
+            datasets: [{
+                label: 'GPA Average',
+                data: [7.2, 7.5, 7.1, 7.8, 8.0, 7.6, 7.9, 8.2],
+                backgroundColor: chartColors.gold,
+                borderColor: '#cfa62b',
+                borderWidth: 1,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: { ticks: { color: '#1a1a1a' } },
+                y: { min: 0, max: 10, ticks: { color: '#1a1a1a' } }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

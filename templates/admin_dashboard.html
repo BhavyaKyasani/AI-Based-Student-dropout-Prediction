@@ -1,0 +1,508 @@
+{% extends 'base.html' %}
+{% block title %}Admin Console - Academia AI{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <h2 class="text-white mb-1"><i class="fa-solid fa-user-gear me-2 text-warning"></i>Admin Console</h2>
+        <p class="text-muted">Manage system configuration, monitor user audit trails, and maintain machine learning prediction models.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <form action="{{ url_for('prediction.retrain_model') }}" method="POST" class="d-inline">
+            <button type="submit" class="btn btn-gold shadow-sm">
+                <i class="fa-solid fa-gears me-2"></i>Retrain Prediction Model
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Drag & Drop Upload Zone Card -->
+<div class="dashboard-card mb-4 border border-gold" style="border: 1px solid #D4AF37 !important;">
+    <div class="card-title-container">
+        <h3><i class="fa-solid fa-file-arrow-up text-warning"></i>Drag-and-Drop Student Data Upload Portal</h3>
+        <span class="badge bg-warning text-dark">CSV &amp; Excel files</span>
+    </div>
+    
+    <div class="p-4 text-center rounded-3 bg-dark bg-opacity-50 border border-secondary" 
+         id="upload-dropzone" 
+         style="border-style: dashed !important; border-width: 2px !important; cursor: pointer; padding: 40px !important;">
+         <i class="fa-solid fa-cloud-arrow-up text-warning mb-3" style="font-size: 48px;"></i>
+         <h5 class="text-white">Drag &amp; Drop Student Datasets Here</h5>
+         <p class="text-muted small mb-0">or click to browse local files (Supports CSV, XLSX, XLS)</p>
+         <input type="file" id="upload-file-input" name="datasets" multiple accept=".csv, .xlsx, .xls" class="d-none">
+    </div>
+    
+    <!-- Selected Files list & progress bar -->
+    <div id="upload-details-container" class="mt-3 d-none">
+        <div class="d-flex justify-content-between text-muted small mb-1">
+            <span id="upload-status-text">Uploading files...</span>
+            <span id="upload-percentage-text">0%</span>
+        </div>
+        <div class="progress bg-secondary bg-opacity-20 mb-3" style="height: 8px;">
+            <div class="progress-bar bg-warning" id="upload-progress-bar" style="width: 0%"></div>
+        </div>
+        <div id="selected-files-list" class="text-white small mb-3"></div>
+    </div>
+    
+    <!-- Validation Report Panel -->
+    <div id="validation-report-container" class="mt-4 d-none">
+        <div class="card border-warning bg-dark p-3 text-light rounded-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="m-0 text-warning" id="validation-title">Dataset Validation Report</h5>
+                <span class="badge" id="validation-badge">Pending</span>
+            </div>
+            <div class="mb-3" id="validation-summary-text" style="font-size: 14px;"></div>
+            
+            <div class="text-danger small mb-2 d-none" id="validation-errors-box" style="max-height: 120px; overflow-y: auto;">
+                <h6 class="text-danger fw-bold m-0 mb-1">Errors (Import Blocked):</h6>
+                <ul class="ps-3 mb-0" id="validation-errors-list"></ul>
+            </div>
+            <div class="text-warning small mb-0 d-none" id="validation-warnings-box" style="max-height: 120px; overflow-y: auto;">
+                <h6 class="text-warning fw-bold m-0 mb-1">Warnings (Auto-resolved):</h6>
+                <ul class="ps-3 mb-0" id="validation-warnings-list"></ul>
+            </div>
+        </div>
+        
+        <!-- Preview Grid -->
+        <h5 class="text-white mb-2">Data Preview (First 5 Rows)</h5>
+        <div class="table-responsive mb-3 rounded-3" style="max-height: 250px;">
+            <table class="table table-bordered table-sm text-center align-middle" 
+                   id="preview-table"
+                   style="background-color: var(--bg-card); color: var(--text-card); font-size: 12px;">
+                <thead class="table-dark" id="preview-thead">
+                </thead>
+                <tbody id="preview-tbody">
+                </tbody>
+            </table>
+        </div>
+        
+        <form id="import-confirm-form" action="/admin/confirm-import" method="POST">
+            <input type="hidden" name="master_temp_path" id="master-temp-path-input">
+            <button type="submit" class="btn btn-gold w-100 py-2 shadow-sm" id="confirm-import-btn" disabled>
+                <i class="fa-solid fa-square-check me-2"></i>Confirm Integration &amp; Run Batch Predictions
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Model Performance Matrix -->
+<div class="dashboard-card">
+    <div class="card-title-container">
+        <h3><i class="fa-solid fa-square-poll-vertical text-warning"></i>Model Accuracy Matrix &amp; Comparison</h3>
+        <span class="badge bg-success">Active: {{ metrics.get('best_model_name', 'XGBoost') }}</span>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-bordered text-center align-middle" style="background-color: var(--bg-card); color: var(--text-card);">
+            <thead>
+                <tr class="table-dark">
+                    <th>Model Name</th>
+                    <th>Accuracy</th>
+                    <th>Precision (Positive Predictive Value)</th>
+                    <th>Recall (Sensitivity)</th>
+                    <th>F1 Score (Balanced Index)</th>
+                    <th>ROC AUC (Discriminatory Power)</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for model_name, score in metrics.get('metrics', {}).items() %}
+                <tr>
+                    <td class="text-start fw-bold">{{ model_name }}</td>
+                    <td>{{ (score.get('Accuracy', 0) * 100)|round(1) }}%</td>
+                    <td>{{ (score.get('Precision', 0) * 100)|round(1) }}%</td>
+                    <td>{{ (score.get('Recall', 0) * 100)|round(1) }}%</td>
+                    <td>{{ (score.get('F1_Score', 0) * 100)|round(1) }}%</td>
+                    <td>{{ (score.get('ROC_AUC', 0) * 100)|round(1) }}%</td>
+                    <td>
+                        {% if model_name == metrics.get('best_model_name') %}
+                        <span class="badge bg-success">Deployed</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Standby</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row">
+    <!-- User management overview -->
+    <div class="col-lg-5 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-title-container">
+                <h3><i class="fa-solid fa-users-gear text-primary"></i>System Staff Accounts</h3>
+                <span class="badge bg-primary">{{ users|length }} Users</span>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table align-middle" style="background-color: var(--bg-card); color: var(--text-card);">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Name / Email</th>
+                            <th>Role / Permission</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>
+                                <strong>{{ user.full_name }}</strong><br>
+                                <small class="text-muted">{{ user.email }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-dark">{{ user.role }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- System logs -->
+    <div class="col-lg-7 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-title-container">
+                <h3><i class="fa-solid fa-list-check text-muted"></i>Security &amp; Operations Audit Trail</h3>
+                <span class="text-muted" style="font-size: 11px;">Latest 30 Events</span>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm align-middle" style="background-color: var(--bg-card); color: var(--text-card); font-size: 13px;">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Timestamp</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>IP Address</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in audit_logs %}
+                        <tr>
+                            <td><small>{{ log.timestamp.strftime('%d %b %H:%M:%S') }}</small></td>
+                            <td><strong>{{ log.user.username if log.user else 'SYSTEM' }}</strong></td>
+                            <td><span class="badge bg-secondary">{{ log.action }}</span></td>
+                            <td><small class="font-monospace text-muted">{{ log.ip_address or '127.0.0.1' }}</small></td>
+                            <td><small class="text-muted">{{ log.details }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No audit trails recorded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Parent Notifications Logs -->
+    <div class="col-lg-6 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-title-container">
+                <h3><i class="fa-solid fa-bell text-warning"></i>Parent Absence &amp; Risk Notifications Log</h3>
+                <span class="badge bg-warning text-dark">{{ parent_notifications|length }} Alerts Sent</span>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm align-middle" style="background-color: var(--bg-card); color: var(--text-card); font-size: 13px;">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Student</th>
+                            <th>Alert Type</th>
+                            <th>Parent Contacts</th>
+                            <th>Message Preview</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for n in parent_notifications %}
+                        <tr>
+                            <td>
+                                <strong>{{ n.student_name }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ n.notification_type }}</span>
+                            </td>
+                            <td>
+                                <small class="d-block">{{ n.parent_email }}</small>
+                                <small class="text-muted font-monospace">{{ n.parent_phone }}</small>
+                            </td>
+                            <td><small class="text-muted d-block text-truncate" style="max-width: 180px;" title="{{ n.message }}">{{ n.message }}</small></td>
+                            <td><span class="badge bg-success">Sent</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No parent alerts recorded.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Counseling Effectiveness Dashboard -->
+    <div class="col-lg-6 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-title-container">
+                <h3><i class="fa-solid fa-square-poll-vertical text-success"></i>Counseling Effectiveness Averages</h3>
+                <span class="badge bg-success">{{ effectiveness.count }} Interventions</span>
+            </div>
+            
+            {% if effectiveness.count > 0 %}
+            <div class="p-3 bg-dark bg-opacity-50 rounded-3 mb-3 border border-secondary text-center">
+                <span class="text-gold fw-bold fs-5">Institution-wide Student Progress: +{{ effectiveness.improvement_pct }}%</span>
+            </div>
+            <div class="d-flex flex-column gap-3">
+                <!-- Backlog Reduction -->
+                <div>
+                    <div class="d-flex justify-content-between mb-1 small text-muted">
+                        <span>Backlog Count Decrease</span>
+                        <span>{{ effectiveness.backlogs_before }} &rarr; {{ effectiveness.backlogs_after }} backlogs (-{{ (effectiveness.backlogs_before - effectiveness.backlogs_after)|round(1) }})</span>
+                    </div>
+                    <div class="progress bg-secondary bg-opacity-20" style="height: 10px;">
+                        <div class="progress-bar bg-success" style="width: {{ [100 - effectiveness.backlogs_after * 15, 100]|min }}%"></div>
+                    </div>
+                </div>
+                <!-- GPA -->
+                <div>
+                    <div class="d-flex justify-content-between mb-1 small text-muted">
+                        <span>Average GPA Growth</span>
+                        <span>{{ effectiveness.gpa_before }} &rarr; {{ effectiveness.gpa_after }} (+{{ (effectiveness.gpa_after - effectiveness.gpa_before)|round(2) }})</span>
+                    </div>
+                    <div class="progress bg-secondary bg-opacity-20" style="height: 10px;">
+                        <div class="progress-bar bg-warning" style="width: {{ effectiveness.gpa_after * 10 }}%"></div>
+                    </div>
+                </div>
+                <!-- Assignment -->
+                <div>
+                    <div class="d-flex justify-content-between mb-1 small text-muted">
+                        <span>Assignment Submissions</span>
+                        <span>{{ effectiveness.assign_before }}% &rarr; {{ effectiveness.assign_after }}% (+{{ (effectiveness.assign_after - effectiveness.assign_before)|round(1) }}%)</span>
+                    </div>
+                    <div class="progress bg-secondary bg-opacity-20" style="height: 10px;">
+                        <div class="progress-bar bg-info" style="width: {{ effectiveness.assign_after }}%"></div>
+                    </div>
+                </div>
+                <!-- Risk Reduction -->
+                <div>
+                    <div class="d-flex justify-content-between mb-1 small text-muted">
+                        <span>Average Dropout Risk Level Reduction</span>
+                        <span>{{ effectiveness.risk_before }} &rarr; {{ effectiveness.risk_after }} pts (-{{ (effectiveness.risk_before - effectiveness.risk_after)|round(1) }} pts)</span>
+                    </div>
+                    <div class="progress bg-secondary bg-opacity-20" style="height: 10px;">
+                        <div class="progress-bar bg-danger" style="width: {{ 100 - effectiveness.risk_after }}%"></div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-5">No completed counseling interventions recorded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const dropzone = document.getElementById("upload-dropzone");
+    const fileInput = document.getElementById("upload-file-input");
+    const detailsContainer = document.getElementById("upload-details-container");
+    const statusText = document.getElementById("upload-status-text");
+    const percentageText = document.getElementById("upload-percentage-text");
+    const progressBar = document.getElementById("upload-progress-bar");
+    const filesList = document.getElementById("selected-files-list");
+    
+    const validationContainer = document.getElementById("validation-report-container");
+    const validationBadge = document.getElementById("validation-badge");
+    const validationSummary = document.getElementById("validation-summary-text");
+    const errorsBox = document.getElementById("validation-errors-box");
+    const errorsList = document.getElementById("validation-errors-list");
+    const warningsBox = document.getElementById("validation-warnings-box");
+    const warningsList = document.getElementById("validation-warnings-list");
+    
+    const previewTable = document.getElementById("preview-table");
+    const previewThead = document.getElementById("preview-thead");
+    const previewTbody = document.getElementById("preview-tbody");
+    
+    const masterPathInput = document.getElementById("master-temp-path-input");
+    const confirmBtn = document.getElementById("confirm-import-btn");
+    
+    // Open file browser on dropzone click
+    dropzone.addEventListener("click", () => fileInput.click());
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    // Highlight dropzone
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.add('border-warning'), false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => dropzone.classList.remove('border-warning'), false);
+    });
+    
+    // Handle dropped files
+    dropzone.addEventListener('drop', handleDrop, false);
+    fileInput.addEventListener('change', handleFileSelect, false);
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            uploadFiles(files);
+        }
+    }
+    
+    function handleFileSelect(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            uploadFiles(files);
+        }
+    }
+    
+    function uploadFiles(files) {
+        detailsContainer.classList.remove("d-none");
+        validationContainer.classList.add("d-none");
+        confirmBtn.disabled = true;
+        
+        // Show names of files
+        filesList.innerHTML = "<strong>Selected files:</strong> " + Array.from(files).map(f => f.name).join(", ");
+        statusText.innerText = "Uploading & validating datasets...";
+        progressBar.style.width = "0%";
+        percentageText.innerText = "0%";
+        
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('datasets', files[i]);
+        }
+        
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/admin/upload-files', true);
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percent + '%';
+                percentageText.innerText = percent + '%';
+            }
+        });
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                const res = JSON.parse(xhr.responseText);
+                displayValidationReport(res);
+            } else {
+                statusText.innerText = "Upload failed. Server error.";
+                progressBar.classList.add("bg-danger");
+            }
+        };
+        
+        xhr.onerror = function() {
+            statusText.innerText = "Upload failed. Network error.";
+            progressBar.classList.add("bg-danger");
+        };
+        
+        xhr.send(formData);
+    }
+    
+    function displayValidationReport(data) {
+        detailsContainer.classList.add("d-none");
+        validationContainer.classList.remove("d-none");
+        
+        errorsList.innerHTML = "";
+        warningsList.innerHTML = "";
+        errorsBox.classList.add("d-none");
+        warningsBox.classList.add("d-none");
+        
+        if (!data.success) {
+            // Processing level error
+            validationBadge.className = "badge bg-danger text-light";
+            validationBadge.innerText = "Failed";
+            validationSummary.innerText = data.message || "An error occurred during dataset processing.";
+            confirmBtn.disabled = true;
+            return;
+        }
+        
+        const report = data.report;
+        
+        if (report.success) {
+            validationBadge.className = "badge bg-success text-light";
+            validationBadge.innerText = "Passed";
+            validationSummary.innerHTML = `Dataset validation successful! Detected <strong>${report.row_count}</strong> unique student record(s). Ready to merge.`;
+            
+            masterPathInput.value = report.master_temp_path;
+            confirmBtn.disabled = false;
+        } else {
+            validationBadge.className = "badge bg-danger text-light";
+            validationBadge.innerText = "Blocked";
+            validationSummary.innerHTML = `Dataset validation failed. Found blocking errors. Import is blocked.`;
+            confirmBtn.disabled = true;
+        }
+        
+        // Errors list
+        if (report.errors.length > 0) {
+            errorsBox.classList.remove("d-none");
+            report.errors.forEach(err => {
+                const li = document.createElement("li");
+                li.innerText = err;
+                errorsList.appendChild(li);
+            });
+        }
+        
+        // Warnings list
+        if (report.warnings.length > 0) {
+            warningsBox.classList.remove("d-none");
+            report.warnings.forEach(warn => {
+                const li = document.createElement("li");
+                li.innerText = warn;
+                warningsList.appendChild(li);
+            });
+        }
+        
+        // Preview table mapping
+        previewThead.innerHTML = "";
+        previewTbody.innerHTML = "";
+        
+        if (report.headers.length > 0 && report.preview_data.length > 0) {
+            // Render Headers
+            const headerRow = document.createElement("tr");
+            report.headers.forEach(h => {
+                const th = document.createElement("th");
+                th.innerText = h;
+                headerRow.appendChild(th);
+            });
+            previewThead.appendChild(headerRow);
+            
+            // Render rows
+            report.preview_data.forEach(row => {
+                const tr = document.createElement("tr");
+                report.headers.forEach(h => {
+                    const td = document.createElement("td");
+                    td.innerText = row[h] !== undefined ? row[h] : "";
+                    tr.appendChild(td);
+                });
+                previewTbody.appendChild(tr);
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

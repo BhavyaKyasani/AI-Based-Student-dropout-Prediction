@@ -1,0 +1,14 @@
+/* Premium Black + Gold + White Theme Variables */
+:root {
+    --bg: #121212;
+    --sidebar: #0B0B0B;
+    --card: #FFFFFF;
+    --gold: #D4AF37;
+    --gold-hover: #E6C65C;
+    --text: #FFFFFF;
+    --secondary: #BFBFBF;
+    --border: #2A2A2A;
+    --success: #28A745;
+    --warning: #FFC107;
+    --danger: #DC3545;
+}

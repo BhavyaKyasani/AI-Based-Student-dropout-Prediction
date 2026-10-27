@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Notification Center - Academia AI{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-white mb-1"><i class="fa-solid fa-bell me-2 text-warning"></i>Notification Center &amp; Alerts</h2>
+    <p class="text-muted">Broadcast automated risk alerts to academic mentors, parents, and students via SMTP Email, SMS, and WhatsApp channels.</p>
+</div>
+
+<!-- Notification KPIs -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Total Alerts Triggered</span>
+            <i class="fa-solid fa-bullhorn metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ total_alerts }}">{{ total_alerts }}</div>
+        <div class="metric-trend text-muted">System logs</div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-warning)">Pending Dispatch</span>
+            <i class="fa-solid fa-hourglass-half metric-icon text-warning"></i>
+        </div>
+        <div class="metric-value text-warning animate-counter" data-target="{{ pending_alerts }}">{{ pending_alerts }}</div>
+        <div class="metric-trend text-warning">Waiting in queue</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-success)">Sent Communications</span>
+            <i class="fa-solid fa-circle-check metric-icon text-success"></i>
+        </div>
+        <div class="metric-value text-success animate-counter" data-target="{{ sent_alerts }}">{{ sent_alerts }}</div>
+        <div class="metric-trend text-success">Dispatched successfully</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-danger)">Failed Communications</span>
+            <i class="fa-solid fa-circle-xmark metric-icon text-danger"></i>
+        </div>
+        <div class="metric-value text-danger animate-counter" data-target="{{ failed_alerts }}">{{ failed_alerts }}</div>
+        <div class="metric-trend text-danger">Delivery failure logs</div>
+    </div>
+</div>
+
+<!-- Alerts Feed / History Table -->
+<div class="dashboard-card">
+    <div class="card-title-container">
+        <h3><i class="fa-solid fa-envelopes-bulk"></i>Notification Dispatch Queue</h3>
+        <span class="text-muted" style="font-size: 12px;">Real-time communications history</span>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Trigger Date</th>
+                    <th>Student ID</th>
+                    <th>Student Name</th>
+                    <th>Risk Flag</th>
+                    <th>Message / Reason</th>
+                    <th>Channel</th>
+                    <th>Status</th>
+                    <th>Dispatch Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in recent_alerts %}
+                <tr>
+                    <td><small>{{ alert.created_at.strftime('%d %b %Y, %I:%M %p') }}</small></td>
+                    <td><strong>{{ alert.student.student_id }}</strong></td>
+                    <td>{{ alert.student.name }}</td>
+                    <td>
+                        <span class="risk-badge {% if alert.risk_level == 'High' %}high{% else %}medium{% endif %}">
+                            {{ alert.risk_level }}
+                        </span>
+                    </td>
+                    <td><small class="text-muted">{{ alert.message }}</small></td>
+                    <td>
+                        <span class="badge bg-secondary">
+                            <i class="{% if alert.notification_type == 'Email' %}fa-solid fa-envelope{% elif alert.notification_type == 'SMS' %}fa-solid fa-comment-sms{% else %}fa-brands fa-whatsapp text-success{% endif %} me-1"></i>
+                            {{ alert.notification_type }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if alert.status == 'Pending' %}
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-circle-notch fa-spin me-1"></i>Queue</span>
+                        {% else %}
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Sent</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if alert.status == 'Pending' %}
+                        <form action="{{ url_for('alert.send_notification', id=alert.id) }}" method="POST" class="d-inline-flex gap-2">
+                            <select name="notification_type" class="form-select form-select-sm py-0 text-dark" style="width: 100px; font-size: 12px;">
+                                <option value="Email">Email</option>
+                                <option value="SMS">SMS</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-gold py-0">
+                                Send
+                            </button>
+                        </form>
+                        {% else %}
+                        <small class="text-muted font-monospace">{{ alert.sent_at.strftime('%H:%M:%S') }}</small>
+                        {% endif %}
+                        <form action="{{ url_for('alert.dismiss_alert', id=alert.id) }}" method="POST" class="d-inline ms-2">
+                            <button type="submit" class="btn btn-sm btn-outline-danger py-0 border-0" title="Dismiss Alert">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">No communication alerts currently generated by prediction runs.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

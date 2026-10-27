@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Attendance Dashboard - ACADEMIA AI{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <h2 class="text-white mb-1"><i class="fa-solid fa-calendar-check me-2 text-warning"></i>Attendance Analytics &amp; Monitoring</h2>
+        <p class="text-muted">Real-time breakdown of class participation, attendance thresholds, and critical shortage registry.</p>
+    </div>
+</div>
+
+<!-- Attendance KPIs -->
+<div class="metrics-grid mb-4">
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Average Institution Attendance</span>
+            <i class="fa-solid fa-chart-line metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ avg_attendance }}">{{ avg_attendance }}%</div>
+        <div class="metric-trend text-muted">Required: 75.0%</div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-success)">Good Attendance (&ge; 85%)</span>
+            <i class="fa-solid fa-circle-check metric-icon text-success"></i>
+        </div>
+        <div class="metric-value text-success animate-counter" data-target="{{ good_attendance_count }}">{{ good_attendance_count }}</div>
+        <div class="metric-trend text-success">Regular attendees</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-warning)">Warning Threshold (75% - 85%)</span>
+            <i class="fa-solid fa-triangle-exclamation metric-icon text-warning"></i>
+        </div>
+        <div class="metric-value text-warning animate-counter" data-target="{{ warning_attendance_count }}">{{ warning_attendance_count }}</div>
+        <div class="metric-trend text-warning">Monitor closely</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-danger)">Critical Shortage (&lt; 75%)</span>
+            <i class="fa-solid fa-triangle-exclamation metric-icon text-danger"></i>
+        </div>
+        <div class="metric-value text-danger animate-counter" data-target="{{ critical_attendance_count }}">{{ critical_attendance_count }}</div>
+        <div class="metric-trend text-danger">Detention / Risk warning</div>
+    </div>
+</div>
+
+<!-- Critical Attendance Shortage Roster -->
+<div class="dashboard-card border border-danger">
+    <div class="card-title-container">
+        <h3><i class="fa-solid fa-triangle-exclamation text-danger"></i>Critical Attendance Shortage Registry (&lt; 75%)</h3>
+        <span class="badge bg-danger text-light">{{ critical_attendance_count }} Flagged Students</span>
+    </div>
+    <div class="table-responsive">
+        <table class="custom-table align-middle">
+            <thead>
+                <tr>
+                    <th>Roll Number</th>
+                    <th>Student Name</th>
+                    <th>Department</th>
+                    <th>Semester</th>
+                    <th>Current Attendance</th>
+                    <th>Risk Level</th>
+                    <th>Fee Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in critical_attendance_list %}
+                <tr>
+                    <td><strong>{{ student.student_id }}</strong></td>
+                    <td>{{ student.name }}<br><small class="text-muted">{{ student.email }}</small></td>
+                    <td>{{ student.department.code }}</td>
+                    <td>Sem {{ student.semester }}</td>
+                    <td>
+                        <span class="fw-bold text-danger">{{ student.attendance_rate }}%</span>
+                        <div class="progress bg-secondary bg-opacity-20" style="height: 6px; width: 90px;">
+                            <div class="progress-bar bg-danger" style="width: {{ student.attendance_rate }}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="risk-badge {% if student.risk_level == 'High' %}high{% elif student.risk_level == 'Medium' %}medium{% else %}low{% endif %}">
+                            {{ student.risk_level }}
+                        </span>
+                    </td>
+                    <td>{{ student.fee_due|currency }}</td>
+                    <td>
+                        <a href="{{ url_for('student.view_profile', id=student.id) }}" class="btn btn-sm btn-gold p-1 px-2">
+                            <i class="fa-solid fa-user me-1"></i>View Profile
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">No students currently below the 75% attendance threshold. All class participation nominal.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

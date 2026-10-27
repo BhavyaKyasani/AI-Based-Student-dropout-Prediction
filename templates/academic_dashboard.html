@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+{% block title %}Academic Dashboard - Academia AI{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-white mb-1"><i class="fa-solid fa-book-open me-2 text-warning"></i>Academic Dashboard</h2>
+    <p class="text-muted">Analyze semester grades, backlog statistics, and monitor overall pass percentages across courses.</p>
+</div>
+
+<!-- Academic KPIs -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Average GPA</span>
+            <i class="fa-solid fa-graduation-cap metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ avg_gpa }}">{{ avg_gpa }}</div>
+        <div class="metric-trend up">
+            <i class="fa-solid fa-check-double me-1"></i>Out of 10.0 Scale
+        </div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Total Active Backlogs</span>
+            <i class="fa-solid fa-circle-xmark metric-icon" style="color: var(--color-danger); background-color: rgba(239, 68, 68, 0.1)"></i>
+        </div>
+        <div class="metric-value text-danger animate-counter" data-target="{{ total_backlogs }}">{{ total_backlogs }}</div>
+        <div class="metric-trend text-danger">
+            <i class="fa-solid fa-circle-exclamation me-1"></i>Unresolved Subjects
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Students with Backlogs</span>
+            <i class="fa-solid fa-circle-exclamation metric-icon" style="color: var(--color-warning); background-color: rgba(245, 158, 11, 0.1)"></i>
+        </div>
+        <div class="metric-value text-warning animate-counter" data-target="{{ students_with_backlogs }}">{{ students_with_backlogs }}</div>
+        <div class="metric-trend text-warning">
+            <i class="fa-solid fa-arrow-trend-up me-1"></i>Action Required
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Semester Pass Rate</span>
+            <i class="fa-solid fa-circle-check metric-icon" style="color: var(--color-success); background-color: rgba(34, 197, 94, 0.1)"></i>
+        </div>
+        <div class="metric-value text-success animate-counter" data-target="{{ pass_percentage }}">{{ pass_percentage }}%</div>
+        <div class="metric-trend text-success">
+            <i class="fa-solid fa-shield-halved me-1"></i>GPA &ge; 5.0 (Pass)
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="charts-grid">
+    <div class="dashboard-card">
+        <div class="card-title-container">
+            <h3><i class="fa-solid fa-chart-pie"></i>GPA Distribution (Students Count)</h3>
+            <span class="text-muted" style="font-size: 12px;">Performance brackets</span>
+        </div>
+        <div style="height: 300px; position: relative;">
+            <canvas id="gpaDistributionChart"></canvas>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="card-title-container">
+            <h3><i class="fa-solid fa-chart-column"></i>Backlogs by Semester</h3>
+            <span class="text-muted" style="font-size: 12px;">Accumulated backlogs</span>
+        </div>
+        <div style="height: 300px; position: relative;">
+            <canvas id="backlogsSemesterChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Course Difficulty / Failure Risk analysis Table -->
+<div class="dashboard-card">
+    <div class="card-title-container">
+        <h3><i class="fa-solid fa-chart-line text-warning"></i>Subject Failure Risk Analysis</h3>
+        <span class="text-muted" style="font-size: 12px;">Top 5 Difficult Courses</span>
+    </div>
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Subject Code</th>
+                    <th>Subject Name</th>
+                    <th>Average Internal Marks</th>
+                    <th>Students Failed (%)</th>
+                    <th>Difficulty Quotient</th>
+                    <th>Required Intervention</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>MA-301</strong></td>
+                    <td>Engineering Mathematics III</td>
+                    <td>58.2 / 100</td>
+                    <td><span class="text-danger fw-bold">24.5%</span></td>
+                    <td>
+                        <span class="risk-badge high">High (8.8/10)</span>
+                    </td>
+                    <td>Provide remedial coaching lectures and mock question banks.</td>
+                </tr>
+                <tr>
+                    <td><strong>CS-402</strong></td>
+                    <td>Theory of Computation</td>
+                    <td>61.5 / 100</td>
+                    <td><span class="text-danger fw-bold">18.2%</span></td>
+                    <td>
+                        <span class="risk-badge high">High (7.9/10)</span>
+                    </td>
+                    <td>Schedule supplementary doubt sessions with senior teaching assistants.</td>
+                </tr>
+                <tr>
+                    <td><strong>EC-201</strong></td>
+                    <td>Electronic Devices and Circuits</td>
+                    <td>65.4 / 100</td>
+                    <td><span class="text-warning fw-bold">14.1%</span></td>
+                    <td>
+                        <span class="risk-badge medium">Medium (6.5/10)</span>
+                    </td>
+                    <td>Organize extra lab demonstrations and peer tutoring groups.</td>
+                </tr>
+                <tr>
+                    <td><strong>ME-102</strong></td>
+                    <td>Engineering Mechanics</td>
+                    <td>68.9 / 100</td>
+                    <td><span class="text-warning fw-bold">12.5%</span></td>
+                    <td>
+                        <span class="risk-badge medium">Medium (6.0/10)</span>
+                    </td>
+                    <td>Distribute animated walkthrough resources and assignments.</td>
+                </tr>
+                <tr>
+                    <td><strong>CS-304</strong></td>
+                    <td>Database Management Systems</td>
+                    <td>74.8 / 100</td>
+                    <td><span class="text-success fw-bold">4.8%</span></td>
+                    <td>
+                        <span class="risk-badge low">Low (3.5/10)</span>
+                    </td>
+                    <td>Standard syllabus completion is sufficient.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. GPA Distribution Donut
+    const gpaCtx = document.getElementById('gpaDistributionChart').getContext('2d');
+    const gpaBins = {{ gpa_bins|tojson }};
+    
+    new Chart(gpaCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Fail (< 5.0)', 'Average (5.0 - 7.0)', 'Good (7.0 - 8.5)', 'Excellent (> 8.5)'],
+            datasets: [{
+                data: gpaBins,
+                backgroundColor: [chartColors.danger, chartColors.warning, '#4F46E5', chartColors.success],
+                borderColor: '#FFFFFF',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#1a1a1a', font: { family: 'Inter', weight: 600 } }
+                }
+            },
+            cutout: '55%'
+        }
+    });
+
+    // 2. Backlogs by Semester Bar Chart
+    const backCtx = document.getElementById('backlogsSemesterChart').getContext('2d');
+    new Chart(backCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7', 'Sem 8'],
+            datasets: [{
+                label: 'Total Backlogs',
+                data: [12, 18, 25, 14, 8, 5, 2, 0],
+                backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                borderColor: chartColors.danger,
+                borderWidth: 1,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#1a1a1a' } },
+                y: { ticks: { color: '#1a1a1a' } }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

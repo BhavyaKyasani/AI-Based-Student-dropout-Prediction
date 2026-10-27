@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+{% block title %}Counseling Portal - Academia AI{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <h2 class="text-white mb-1"><i class="fa-solid fa-comments me-2 text-warning"></i>Mentoring &amp; Counseling Portal</h2>
+        <p class="text-muted">Schedule and log supportive interventions for academic improvement and student retention.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <button type="button" class="btn btn-gold" data-bs-toggle="modal" data-bs-target="#scheduleSessionModal">
+            <i class="fa-solid fa-plus me-2"></i>Schedule Session
+        </button>
+    </div>
+</div>
+
+<!-- Counseling KPIs -->
+<div class="metrics-grid">
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title">Total Interventions</span>
+            <i class="fa-solid fa-handshake-angle metric-icon"></i>
+        </div>
+        <div class="metric-value animate-counter" data-target="{{ total_sessions }}">{{ total_sessions }}</div>
+        <div class="metric-trend text-muted">Sessions logged</div>
+    </div>
+    
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-warning)">Scheduled Sessions</span>
+            <i class="fa-solid fa-calendar-days metric-icon text-warning"></i>
+        </div>
+        <div class="metric-value text-warning animate-counter" data-target="{{ pending_sessions }}">{{ pending_sessions }}</div>
+        <div class="metric-trend text-warning">Upcoming meetings</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-success)">Completed Sessions</span>
+            <i class="fa-solid fa-square-check metric-icon text-success"></i>
+        </div>
+        <div class="metric-value text-success animate-counter" data-target="{{ completed_sessions }}">{{ completed_sessions }}</div>
+        <div class="metric-trend text-success">Interventions resolved</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-header">
+            <span class="metric-title" style="color: var(--color-danger)">Cancelled / No Show</span>
+            <i class="fa-solid fa-rectangle-xmark metric-icon text-danger"></i>
+        </div>
+        <div class="metric-value text-danger animate-counter" data-target="{{ cancelled_sessions }}">{{ cancelled_sessions }}</div>
+        <div class="metric-trend text-danger">Cancelled meetings</div>
+    </div>
+</div>
+
+<!-- Sessions Lists -->
+<div class="row">
+    <!-- Upcoming sessions -->
+    <div class="col-lg-6 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-title-container">
+                <h3><i class="fa-regular fa-clock text-warning"></i>Upcoming Counseling Schedule</h3>
+                <span class="badge bg-warning text-dark">{{ pending_sessions }} Scheduled</span>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table align-middle" style="background-color: var(--bg-card); color: var(--text-card);">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Student</th>
+                            <th>Mentor / Advisor</th>
+                            <th>Scheduled Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in recent_sessions if session.status == 'Scheduled' %}
+                        <tr>
+                            <td>
+                                <strong>{{ session.student.name }}</strong><br>
+                                <small class="text-muted">{{ session.student.student_id }}</small>
+                            </td>
+                            <td>{{ session.counselor.full_name }}</td>
+                            <td>{{ session.scheduled_date.strftime('%d %b %Y, %I:%M %p') }}</td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-gold py-1" data-bs-toggle="modal" data-bs-target="#completeModal-{{ session.id }}">
+                                        Resolve
+                                    </button>
+                                    <form action="{{ url_for('counseling.cancel_session', id=session.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1">Cancel</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Resolve Counseling Modal -->
+                        <div class="modal fade" id="completeModal-{{ session.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content text-dark">
+                                    <div class="modal-header bg-dark text-white">
+                                        <h5 class="modal-title">Complete Counseling: {{ session.student.name }}</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form action="{{ url_for('counseling.complete_session', id=session.id) }}" method="POST" class="custom-form p-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Counselor / Mentor Notes</label>
+                                            <textarea name="notes" class="form-control" rows="3" placeholder="Describe the discussion, issues identified..." required></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Corrective Actions Taken</label>
+                                            <textarea name="actions_taken" class="form-control" rows="2" placeholder="e.g. Arranged tutoring classes, offered fee installment plan..." required></textarea>
+                                        </div>
+                                        <div class="text-end">
+                                            <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Close</button>
+                                            <button type="submit" class="btn btn-gold btn-sm">Save Resolution</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">No scheduled sessions. Click "Schedule Session" above.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed / Historical Session logs -->
+    <div class="col-lg-6 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-title-container">
+                <h3><i class="fa-solid fa-list-check text-success"></i>Intervention Log History</h3>
+                <span class="badge bg-success">{{ completed_sessions }} Completed</span>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table align-middle" style="background-color: var(--bg-card); color: var(--text-card);">
+                    <thead>
+                        <tr class="table-light">
+                            <th>Student</th>
+                            <th>Mentor Notes</th>
+                            <th>Actions Taken</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in recent_sessions if session.status == 'Completed' %}
+                        <tr>
+                            <td>
+                                <strong>{{ session.student.name }}</strong><br>
+                                <small class="text-muted">By {{ session.counselor.full_name }}</small>
+                            </td>
+                            <td><small class="text-muted d-block" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ session.notes }}">{{ session.notes }}</small></td>
+                            <td><small class="text-muted d-block" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ session.actions_taken }}">{{ session.actions_taken }}</small></td>
+                            <td><small>{{ session.updated_at.strftime('%d %b %Y') }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted">No completed sessions recorded in log history yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Counseling Effectiveness / Before vs After Intervention Dashboard -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-title-container">
+                <h3><i class="fa-solid fa-square-poll-vertical text-warning"></i>Counseling Intervention Effectiveness Dashboard</h3>
+                <span class="badge bg-gold text-dark font-poppins">{{ effectiveness.count }} Cases Analyzed</span>
+            </div>
+            {% if effectiveness.count > 0 %}
+            <div class="row align-items-center mt-3">
+                <div class="col-md-5">
+                    <canvas id="effectivenessChart" style="max-height: 280px;"></canvas>
+                </div>
+                <div class="col-md-7">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="border border-secondary p-3 rounded-3 bg-secondary bg-opacity-10 text-center">
+                                <div class="text-muted small">Backlog Count Decline</div>
+                                <h4 class="mb-0 text-success fw-bold">{{ effectiveness.backlogs_before }} &rarr; {{ effectiveness.backlogs_after }}</h4>
+                                <small class="text-success fw-semibold"><i class="fa-solid fa-arrow-trend-down"></i> -{{ (effectiveness.backlogs_before - effectiveness.backlogs_after)|round(1) }} backlogs</small>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="border border-secondary p-3 rounded-3 bg-secondary bg-opacity-10 text-center">
+                                <div class="text-muted small">Average GPA Progression</div>
+                                <h4 class="mb-0 text-success fw-bold">{{ effectiveness.gpa_before }} &rarr; {{ effectiveness.gpa_after }}</h4>
+                                <small class="text-success fw-semibold"><i class="fa-solid fa-arrow-trend-up"></i> +{{ (effectiveness.gpa_after - effectiveness.gpa_before)|round(2) }} grade points</small>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="border border-secondary p-3 rounded-3 bg-secondary bg-opacity-10 text-center">
+                                <div class="text-muted small">Assignment Submission Completion</div>
+                                <h4 class="mb-0 text-success fw-bold">{{ effectiveness.assign_before }}% &rarr; {{ effectiveness.assign_after }}%</h4>
+                                <small class="text-success fw-semibold"><i class="fa-solid fa-arrow-trend-up"></i> +{{ (effectiveness.assign_after - effectiveness.assign_before)|round(1) }}% increase</small>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="border border-secondary p-3 rounded-3 bg-secondary bg-opacity-10 text-center">
+                                <div class="text-muted small">Risk Score Reduction</div>
+                                <h4 class="mb-0 text-warning fw-bold">{{ effectiveness.risk_before }} &rarr; {{ effectiveness.risk_after }}</h4>
+                                <small class="text-success fw-semibold"><i class="fa-solid fa-arrow-trend-down"></i> -{{ (effectiveness.risk_before - effectiveness.risk_after)|round(1) }} pts decline</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-success bg-opacity-10 rounded-3 mt-3 border border-success text-center">
+                        <span class="text-success fw-bold fs-5"><i class="fa-solid fa-shield-halved me-2"></i>Overall Student Improvement: +{{ effectiveness.improvement_pct }}%</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4">No completed counseling interventions recorded yet to evaluate effectiveness.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Session Modal -->
+<div class="modal fade" id="scheduleSessionModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content text-dark">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="scheduleModalLabel">Schedule Counseling Session</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('counseling.schedule_session') }}" method="POST" class="custom-form p-3">
+                <div class="mb-3">
+                    <label for="student_select" class="form-label">Select Student</label>
+                    <select name="student_id" id="student_select" class="form-select text-dark" required>
+                        <option value="">Choose Student...</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="counselor_select" class="form-label">Assigned Counselor / Mentor</label>
+                    <select name="counselor_id" id="counselor_select" class="form-select text-dark" required>
+                        <option value="">Choose Staff...</option>
+                        {% for c in counselors %}
+                        <option value="{{ c.id }}">{{ c.full_name }} ({{ c.role }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="scheduled_date" class="form-label">Schedule Date &amp; Time</label>
+                    <input type="datetime-local" name="scheduled_date" id="scheduled_date" class="form-control text-dark" required>
+                </div>
+
+                <div class="text-end">
+                    <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-gold btn-sm">Schedule Meeting</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const studentSelect = document.getElementById('student_select');
+    if (studentSelect) {
+        fetch('/api/students-list')
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = `${s.name} (${s.student_id}) - ${s.risk_level} Risk`;
+                    studentSelect.appendChild(opt);
+                });
+            })
+            .catch(err => console.log("Dropdown fetch err: ", err));
+    }
+    
+    {% if effectiveness.count > 0 %}
+    const effCtx = document.getElementById('effectivenessChart').getContext('2d');
+    new Chart(effCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Backlogs (x10)', 'GPA (x10)', 'Assignments (%)', 'Risk Score'],
+            datasets: [
+                {
+                    label: 'Before Intervention',
+                    data: [
+                        {{ effectiveness.backlogs_before * 10 }},
+                        {{ effectiveness.gpa_before * 10 }},
+                        {{ effectiveness.assign_before }},
+                        {{ effectiveness.risk_before }}
+                    ],
+                    backgroundColor: 'rgba(255, 99, 132, 0.4)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1.5
+                },
+                {
+                    label: 'Current Status (After)',
+                    data: [
+                        {{ effectiveness.backlogs_after * 10 }},
+                        {{ effectiveness.gpa_after * 10 }},
+                        {{ effectiveness.assign_after }},
+                        {{ effectiveness.risk_after }}
+                    ],
+                    backgroundColor: 'rgba(75, 192, 192, 0.4)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1.5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff'
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    ticks: {
+                        color: '#ffffff'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#ffffff'
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

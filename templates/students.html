@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block title %}Student Directory - Academia AI{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <h2 class="text-white mb-1"><i class="fa-solid fa-user-graduate me-2 text-warning"></i>Student Directory</h2>
+        <p class="text-muted">Search, filter, and manage student performance data and records.</p>
+    </div>
+    {% if session.get('role') in ['Admin', 'Faculty'] %}
+    <div class="col-md-4 text-md-end">
+        <button type="button" class="btn btn-gold" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+            <i class="fa-solid fa-user-plus me-2"></i>Add Student
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Filters Panel -->
+<div class="dashboard-card">
+    <form method="GET" action="{{ url_for('student.list_students') }}" class="row g-3 align-items-end text-dark">
+        <div class="col-md-3">
+            <label for="search" class="form-label mb-1 fw-semibold text-muted" style="font-size: 13px;">Search Student</label>
+            <input type="text" name="search" id="search" class="form-control text-dark" placeholder="Name or ID..." value="{{ search or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label for="department_id" class="form-label mb-1 fw-semibold text-muted" style="font-size: 13px;">Department</label>
+            <select name="department_id" id="department_id" class="form-select text-dark">
+                <option value="">All Departments</option>
+                {% for dept in departments %}
+                <option value="{{ dept.id }}" {% if dept_id|int == dept.id %}selected{% endif %}>{{ dept.code }} - {{ dept.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="semester" class="form-label mb-1 fw-semibold text-muted" style="font-size: 13px;">Semester</label>
+            <select name="semester" id="semester" class="form-select text-dark">
+                <option value="">All Semesters</option>
+                {% for sem in range(1, 9) %}
+                <option value="{{ sem }}" {% if semester|int == sem %}selected{% endif %}>Semester {{ sem }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="risk_level" class="form-label mb-1 fw-semibold text-muted" style="font-size: 13px;">Risk Level</label>
+            <select name="risk_level" id="risk_level" class="form-select text-dark">
+                <option value="">All Risks</option>
+                <option value="Low" {% if risk_level == 'Low' %}selected{% endif %}>Low Risk</option>
+                <option value="Medium" {% if risk_level == 'Medium' %}selected{% endif %}>Medium Risk</option>
+                <option value="High" {% if risk_level == 'High' %}selected{% endif %}>High Risk</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-gold w-100"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <a href="{{ url_for('student.list_students') }}" class="btn btn-outline-gold w-100">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Student Table -->
+<div class="dashboard-card">
+    <div class="table-responsive">
+        <table class="custom-table align-middle">
+            <thead>
+                <tr>
+                    <th>Roll Number</th>
+                    <th>Full Name</th>
+                    <th>Semester</th>
+                    <th>GPA</th>
+                    <th>Attendance</th>
+                    <th>Backlogs</th>
+                    <th>Fee Due</th>
+                    <th>Risk Status</th>
+                    <th>Intervention Driver</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td><strong>{{ student.student_id }}</strong></td>
+                    <td>{{ student.name }}<br><small class="text-muted" style="font-size: 11px;">{{ student.email }}</small></td>
+                    <td>Sem {{ student.semester }}</td>
+                    <td>{{ student.current_gpa }}</td>
+                    <td class="{% if student.attendance_rate < 75 %}text-danger fw-bold{% endif %}">{{ student.attendance_rate }}%</td>
+                    <td>
+                        <span class="badge {% if student.backlogs > 0 %}bg-danger{% else %}bg-secondary{% endif %}">{{ student.backlogs }}</span>
+                    </td>
+                    <td>{{ student.fee_due|currency }}</td>
+                    <td>
+                        <span class="risk-badge {% if student.risk_level == 'High' %}high{% elif student.risk_level == 'Medium' %}medium{% else %}low{% endif %}">
+                            {{ student.risk_level }}
+                        </span>
+                    </td>
+                    <td><small class="text-muted d-block text-truncate" style="max-width: 180px;">{{ student.reasons or 'Nominal' }}</small></td>
+                    <td class="text-center">
+                        <div class="d-inline-flex gap-2">
+                            <a href="{{ url_for('student.view_profile', id=student.id) }}" class="btn btn-sm btn-outline-dark py-1" title="View Profile">
+                                <i class="fa-solid fa-eye text-dark"></i>
+                            </a>
+                            {% if session.get('role') in ['Admin', 'Faculty'] %}
+                            <button type="button" class="btn btn-sm btn-outline-primary py-1" data-bs-toggle="modal" data-bs-target="#editModal-{{ student.id }}" title="Edit Details">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            {% endif %}
+                            {% if session.get('role') == 'Admin' %}
+                            <form action="{{ url_for('student.delete_student', id=student.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete student {{ student.name }}? This will clear all historical logs.');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-1" title="Delete Student">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+
+                <!-- Edit Student Modal for this student -->
+                {% if session.get('role') in ['Admin', 'Faculty'] %}
+                <div class="modal fade" id="editModal-{{ student.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg text-dark">
+                        <div class="modal-content">
+                            <div class="modal-header bg-dark text-white">
+                                <h5 class="modal-title">Edit Record: {{ student.name }} ({{ student.student_id }})</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form action="{{ url_for('student.edit_student', id=student.id) }}" method="POST" class="custom-form p-4">
+                                <div class="row g-3">
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Full Name</label>
+                                        <input type="text" name="name" class="form-control" value="{{ student.name }}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Email Address</label>
+                                        <input type="email" name="email" class="form-control" value="{{ student.email }}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Contact Phone</label>
+                                        <input type="text" name="phone" class="form-control" value="{{ student.phone }}" required>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <label class="form-label">Gender</label>
+                                        <select name="gender" class="form-select" required>
+                                            <option value="Male" {% if student.gender == 'Male' %}selected{% endif %}>Male</option>
+                                            <option value="Female" {% if student.gender == 'Female' %}selected{% endif %}>Female</option>
+                                            <option value="Other" {% if student.gender == 'Other' %}selected{% endif %}>Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <label class="form-label">Semester</label>
+                                        <select name="semester" class="form-select" required>
+                                            {% for sem in range(1, 9) %}
+                                            <option value="{{ sem }}" {% if student.semester == sem %}selected{% endif %}>Semester {{ sem }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Department</label>
+                                        <select name="department_id" class="form-select" required>
+                                            {% for dept in departments %}
+                                            <option value="{{ dept.id }}" {% if student.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    
+                                    <hr class="my-3">
+                                    <h6 class="mb-0 fw-bold" style="color: #D4AF37 !important;"><i class="fa-solid fa-chart-line me-2"></i>Performance Indicators</h6>
+                                    
+                                    <div class="col-md-3 mb-2">
+                                        <label class="form-label">Current GPA (0-10)</label>
+                                        <input type="number" step="0.01" min="0" max="10" name="current_gpa" class="form-control" value="{{ student.current_gpa }}" required>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <label class="form-label">Active Backlogs</label>
+                                        <input type="number" min="0" max="20" name="backlogs" class="form-control" value="{{ student.backlogs }}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">Outstanding Fees (Rs.)</label>
+                                        <input type="number" step="1" min="0" name="fee_due" class="form-control" value="{{ student.fee_due }}" required>
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label">Attendance Rate %</label>
+                                        <input type="number" step="0.1" min="0" max="100" name="attendance_rate" class="form-control" value="{{ student.attendance_rate }}" required>
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label">Assignment Rate %</label>
+                                        <input type="number" step="0.1" min="0" max="100" name="assignment_rate" class="form-control" value="{{ student.assignment_rate }}" required>
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <label class="form-label">Lab Score %</label>
+                                        <input type="number" step="0.1" min="0" max="100" name="lab_marks" class="form-control" value="{{ student.lab_marks }}" required>
+                                    </div>
+                                </div>
+                                <div class="text-end mt-4">
+                                    <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Close</button>
+                                    <button type="submit" class="btn btn-gold btn-sm">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center py-4 text-muted">No students registered in directory database.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Student Modal -->
+{% if session.get('role') in ['Admin', 'Faculty'] %}
+<div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg text-dark">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addModalLabel">Register New Student Profile</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('student.add_student') }}" method="POST" class="custom-form p-4">
+                <div class="row g-3">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Student Roll ID (Unique)</label>
+                        <input type="text" name="student_id" class="form-control" placeholder="e.g. CSE-2026-004" required>
+                    </div>
+                    <div class="col-md-8 mb-2">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="Enter student's full name" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" name="email" class="form-control" placeholder="e.g. name@college.edu" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Contact Phone</label>
+                        <input type="text" name="phone" class="form-control" placeholder="e.g. +91 9988776655" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Gender</label>
+                        <select name="gender" class="form-select" required>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Semester</label>
+                        <select name="semester" class="form-select" required>
+                            {% for sem in range(1, 9) %}
+                            <option value="{{ sem }}">Semester {{ sem }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Academic Department</label>
+                        <select name="department_id" class="form-select" required>
+                            {% for dept in departments %}
+                            <option value="{{ dept.id }}">{{ dept.name }} ({{ dept.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <hr class="my-3">
+                    <h6 class="mb-0 fw-bold" style="color: #D4AF37 !important;"><i class="fa-solid fa-chart-line me-2"></i>Performance Indicators</h6>
+                    
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Current GPA (0-10)</label>
+                        <input type="number" step="0.01" min="0" max="10" name="current_gpa" class="form-control" placeholder="e.g. 7.8" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Active Backlogs</label>
+                        <input type="number" min="0" max="20" name="backlogs" class="form-control" value="0" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Outstanding Fees (Rs.)</label>
+                        <input type="number" step="1" min="0" name="fee_due" class="form-control" value="0" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Attendance Rate %</label>
+                        <input type="number" step="0.1" min="0" max="100" name="attendance_rate" class="form-control" value="95.0" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Assignment Rate %</label>
+                        <input type="number" step="0.1" min="0" max="100" name="assignment_rate" class="form-control" value="95.0" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Lab Score %</label>
+                        <input type="number" step="0.1" min="0" max="100" name="lab_marks" class="form-control" value="90.0" required>
+                    </div>
+                </div>
+                <div class="text-end mt-4">
+                    <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-gold btn-sm">Add Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

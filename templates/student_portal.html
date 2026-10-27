@@ -1,0 +1,420 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Academic Portal - ACADEMIA AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Summary Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark border-gold text-light p-4 rounded-4" style="border: 1px solid #D4AF37;">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h2 class="text-gold font-poppins mb-1">Welcome, {{ student.name }}!</h2>
+                        <p class="text-muted mb-0">Student ID: <strong>{{ student.student_id }}</strong> | Department: {{ student.department.name }} | Semester: {{ student.semester }}</p>
+                    </div>
+                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                        <span class="fs-6 me-2 text-muted">Dropout Risk Level:</span>
+                        {% if student.risk_level == 'High' %}
+                        <span class="badge bg-danger text-light px-3 py-2 fs-6 rounded-pill"><i class="fa-solid fa-triangle-exclamation me-1"></i> High</span>
+                        {% elif student.risk_level == 'Medium' %}
+                        <span class="badge bg-warning text-dark px-3 py-2 fs-6 rounded-pill"><i class="fa-solid fa-triangle-exclamation me-1"></i> Medium</span>
+                        {% else %}
+                        <span class="badge bg-success text-light px-3 py-2 fs-6 rounded-pill"><i class="fa-solid fa-circle-check me-1"></i> Low</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Row -->
+    <div class="row g-4 mb-4">
+        <!-- Attendance -->
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-0 shadow rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 bg-opacity-10 me-3 bg-info text-info">
+                        <i class="fa-solid fa-calendar-days fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Attendance Rate</div>
+                        <h3 class="mb-0 text-info fw-bold">{{ student.attendance_rate }}%</h3>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress bg-secondary" style="height: 6px;">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: {{ student.attendance_rate }}%"></div>
+                    </div>
+                    <small class="text-muted mt-1 d-block">Threshold: 75.0% required</small>
+                </div>
+            </div>
+        </div>
+        <!-- GPA -->
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-0 shadow rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 bg-opacity-10 me-3 bg-warning text-warning">
+                        <i class="fa-solid fa-award fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Current CGPA</div>
+                        <h3 class="mb-0 text-warning fw-bold">{{ student.current_gpa }} / 10</h3>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress bg-secondary" style="height: 6px;">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: {{ student.current_gpa * 10 }}%"></div>
+                    </div>
+                    <small class="text-muted mt-1 d-block">Backlogs: {{ student.backlogs }}</small>
+                </div>
+            </div>
+        </div>
+        <!-- Assignments -->
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-0 shadow rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 bg-opacity-10 me-3 bg-success text-success">
+                        <i class="fa-solid fa-list-check fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Assignments Finished</div>
+                        <h3 class="mb-0 text-success fw-bold">{{ student.assignment_rate }}%</h3>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="progress bg-secondary" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ student.assignment_rate }}%"></div>
+                    </div>
+                    <small class="text-muted mt-1 d-block">All pending lists below</small>
+                </div>
+            </div>
+        </div>
+        <!-- Fee Status -->
+        <div class="col-md-3">
+            <div class="card bg-dark text-light border-0 shadow rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle p-3 bg-opacity-10 me-3 bg-danger text-danger">
+                        <i class="fa-solid fa-credit-card fs-4"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Outstanding Fees</div>
+                        <h3 class="mb-0 text-danger fw-bold">
+                            {% if fee %}
+                            Rs. {{ "{:,.2f}".format(fee.due_amount) }}
+                            {% else %}
+                            Rs. 0.00
+                            {% endif %}
+                        </h3>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="badge {% if fee and fee.payment_status == 'Paid' %}bg-success{% else %}bg-danger{% endif %} text-light">
+                        {% if fee %}{{ fee.payment_status }}{% else %}Paid{% endif %}
+                    </span>
+                    <small class="text-muted ms-2">Due Date: {% if fee and fee.due_date %}{{ fee.due_date.strftime('%d-%b-%Y') }}{% else %}N/A{% endif %}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Tabs -->
+    <div class="row g-4">
+        <!-- Left Column: Details & Performance Dashboard -->
+        <div class="col-lg-8">
+            <!-- Academic Performance Comparer (Before vs After) -->
+            {% if completed_counseling %}
+            <div class="card bg-dark text-light border-0 shadow rounded-4 mb-4">
+                <div class="card-header bg-transparent border-bottom border-secondary d-flex justify-content-between align-items-center py-3">
+                    <h5 class="mb-0 text-gold"><i class="fa-solid fa-chart-line me-2"></i>Intervention Impact Dashboard (Before vs After Counseling)</h5>
+                    <span class="badge bg-gold text-dark font-poppins px-2 py-1">Counseled on: {{ completed_counseling.scheduled_date.strftime('%d-%b-%Y') }}</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-4">Compare your academic parameters before the counseling intervention session against your current live status.</p>
+                    <div class="row align-items-center">
+                        <div class="col-md-6 mb-4 mb-md-0">
+                            <canvas id="beforeAfterChart" style="max-height: 250px;"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex flex-column gap-3">
+                                <!-- Attendance -->
+                                <div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="small text-muted">Attendance Rate</span>
+                                        <span class="small text-light">{{ completed_counseling.attendance_before or 70.0 }}% &rarr; {{ student.attendance_rate }}%</span>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <span class="badge bg-secondary text-light small" style="width: 55px;">Before</span>
+                                        <div class="progress bg-opacity-10 bg-secondary flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-secondary" style="width: {{ completed_counseling.attendance_before or 70.0 }}%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center mt-1">
+                                        <span class="badge bg-info text-dark small" style="width: 55px;">Current</span>
+                                        <div class="progress bg-opacity-10 bg-info flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-info" style="width: {{ student.attendance_rate }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- GPA -->
+                                <div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="small text-muted">GPA</span>
+                                        <span class="small text-light">{{ completed_counseling.gpa_before }} &rarr; {{ student.current_gpa }}</span>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <span class="badge bg-secondary text-light small" style="width: 55px;">Before</span>
+                                        <div class="progress bg-opacity-10 bg-secondary flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-secondary" style="width: {{ completed_counseling.gpa_before * 10 }}%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center mt-1">
+                                        <span class="badge bg-warning text-dark small" style="width: 55px;">Current</span>
+                                        <div class="progress bg-opacity-10 bg-warning flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-warning" style="width: {{ student.current_gpa * 10 }}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Risk Reduction -->
+                                <div class="p-3 bg-secondary bg-opacity-10 rounded-3 mt-2 border border-secondary">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div class="fw-bold text-gold small">Risk Level Status</div>
+                                            <div class="small text-muted">Original: {{ completed_counseling.risk_level_before }} Risk</div>
+                                        </div>
+                                        <div>
+                                            <span class="badge bg-danger text-light px-2 py-1">{{ completed_counseling.risk_level_before }}</span>
+                                            <span class="text-muted mx-2">&rarr;</span>
+                                            {% if student.risk_level == 'High' %}
+                                            <span class="badge bg-danger text-light px-2 py-1">High</span>
+                                            {% elif student.risk_level == 'Medium' %}
+                                            <span class="badge bg-warning text-dark px-2 py-1">Medium</span>
+                                            {% else %}
+                                            <span class="badge bg-success text-light px-2 py-1">Low</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+
+
+            <!-- Academic Results Table -->
+            <div class="card bg-dark text-light border-0 shadow rounded-4 mb-4">
+                <div class="card-header bg-transparent border-bottom border-secondary py-3">
+                    <h5 class="mb-0 text-gold"><i class="fa-solid fa-book me-2"></i>Academic Results & Assessments</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0" style="vertical-align: middle;">
+                            <thead>
+                                <tr class="text-gold">
+                                    <th scope="col" class="ps-4">Subject</th>
+                                    <th scope="col">Assessment Type</th>
+                                    <th scope="col">Marks Obtained</th>
+                                    <th scope="col">Max Marks</th>
+                                    <th scope="col" class="pe-4">Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for m in internal_marks %}
+                                <tr>
+                                    <td class="ps-4 fw-semibold">{{ m.subject }}</td>
+                                    <td><span class="badge bg-secondary text-light">Internal</span></td>
+                                    <td>{{ m.marks_obtained }}</td>
+                                    <td>{{ m.max_marks }}</td>
+                                    <td class="pe-4 fw-bold {% if (m.marks_obtained / m.max_marks * 100) >= 50 %}text-success{% else %}text-danger{% endif %}">
+                                        {{ "{:.1f}".format(m.marks_obtained / m.max_marks * 100) }}%
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% for m in semester_marks %}
+                                <tr>
+                                    <td class="ps-4 fw-semibold">{{ m.subject }}</td>
+                                    <td><span class="badge bg-primary text-light">Semester Exam</span></td>
+                                    <td>{{ m.marks_obtained }}</td>
+                                    <td>{{ m.max_marks }}</td>
+                                    <td class="pe-4 fw-bold {% if (m.marks_obtained / m.max_marks * 100) >= 50 %}text-success{% else %}text-danger{% endif %}">
+                                        {{ "{:.1f}".format(m.marks_obtained / m.max_marks * 100) }}%
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if not internal_marks and not semester_marks %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">No academic records found.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Counseling, Notifications & Assignments -->
+        <div class="col-lg-4">
+            <!-- Notifications Card -->
+            <div id="notifications" class="card bg-dark text-light border-0 shadow rounded-4 mb-4">
+                <div class="card-header bg-transparent border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-gold"><i class="fa-solid fa-bell me-2"></i>Notifications from Mentors</h5>
+                    <span class="badge bg-gold text-dark">{{ notifications|length }}</span>
+                </div>
+                <div class="card-body p-0" style="max-height: 320px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush bg-transparent">
+                        {% for notif in notifications %}
+                        <li class="list-group-item bg-transparent text-light border-secondary p-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-bold text-gold small">Prof. S. R. Sharma (Mentor)</span>
+                                <small class="text-muted">{{ notif.created_at.strftime('%d-%b %I:%M %p') }}</small>
+                            </div>
+                            <p class="small mb-0 text-light opacity-75">{{ notif.message }}</p>
+                        </li>
+                        {% endfor %}
+                        {% if not notifications %}
+                        <li class="list-group-item bg-transparent text-muted border-0 text-center py-4">No notifications from your mentor.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Assignment Checklist -->
+            <div class="card bg-dark text-light border-0 shadow rounded-4 mb-4">
+                <div class="card-header bg-transparent border-bottom border-secondary py-3">
+                    <h5 class="mb-0 text-gold"><i class="fa-solid fa-list-check me-2"></i>Assignment Submissions</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush bg-transparent">
+                        {% for a in assignments %}
+                        <li class="list-group-item bg-transparent text-light border-secondary p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-semibold">{{ a.title }}</div>
+                                    <small class="text-muted">{{ a.subject }} | Due: {{ a.due_date.strftime('%d-%b-%Y') }}</small>
+                                </div>
+                                <div>
+                                    {% if a.status == 'Completed' %}
+                                    <span class="badge bg-success text-light">Completed</span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                        {% if not assignments %}
+                        <li class="list-group-item bg-transparent text-muted border-0 text-center py-4">No assignments assigned.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Counseling History -->
+            <div class="card bg-dark text-light border-0 shadow rounded-4">
+                <div class="card-header bg-transparent border-bottom border-secondary py-3">
+                    <h5 class="mb-0 text-gold"><i class="fa-solid fa-comments me-2"></i>Counseling Log</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush bg-transparent">
+                        {% for c in counselings %}
+                        <li class="list-group-item bg-transparent text-light border-secondary p-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-semibold text-gold">{{ c.counselor.full_name }}</span>
+                                <span class="badge {% if c.status == 'Completed' %}bg-success{% elif c.status == 'Scheduled' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-light">
+                                    {{ c.status }}
+                                </span>
+                            </div>
+                            <small class="text-muted d-block mb-2">Session Date: {{ c.scheduled_date.strftime('%d-%b-%Y %I:%M %p') }}</small>
+                            {% if c.notes %}
+                            <div class="p-2 rounded bg-dark border border-secondary small text-muted">
+                                <strong>Feedback Notes:</strong> {{ c.notes }}
+                            </div>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                        {% if not counselings %}
+                        <li class="list-group-item bg-transparent text-muted border-0 text-center py-4">No counseling sessions scheduled.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if completed_counseling %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('beforeAfterChart').getContext('2d');
+        const beforeAfterChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Attendance (%)', 'GPA (x10)', 'Assignments (%)', 'Internal Avg (%)'],
+                datasets: [
+                    {
+                        label: 'Before Counseling',
+                        data: [
+                            {{ completed_counseling.attendance_before or 70.0 }},
+                            {{ completed_counseling.gpa_before * 10 }},
+                            {{ completed_counseling.assignment_before }},
+                            {{ completed_counseling.internal_marks_before }}
+                        ],
+                        backgroundColor: 'rgba(255, 99, 132, 0.4)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1.5
+                    },
+                    {
+                        label: 'Current (After)',
+                        data: [
+                            {{ student.attendance_rate }},
+                            {{ student.current_gpa * 10 }},
+                            {{ student.assignment_rate }},
+                            {{ current_internal_avg }}
+                        ],
+                        backgroundColor: 'rgba(75, 192, 192, 0.4)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1.5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#ffffff'
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#ffffff'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#ffffff'
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}
