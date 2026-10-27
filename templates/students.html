@@ -9,11 +9,29 @@
     </div>
     {% if session.get('role') in ['Admin', 'Faculty'] %}
     <div class="col-md-4 text-md-end">
-        <button type="button" class="btn btn-gold" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+        <button type="button" class="btn btn-gold" id="openAddStudentBtn" data-bs-toggle="modal" data-bs-target="#addStudentModal">
             <i class="fa-solid fa-user-plus me-2"></i>Add Student
         </button>
     </div>
     {% endif %}
+</div>
+
+<!-- Flash messages (server-side) -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show mb-3" role="alert" style="border-radius:12px; border-left:5px solid;">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Inline AJAX feedback (for Add Student) -->
+<div id="ajaxAlert" class="alert alert-dismissible fade show mb-3" role="alert" style="display:none!important; border-radius:12px; border-left:5px solid;">
+    <span id="ajaxAlertMsg"></span>
+    <button type="button" class="btn-close" onclick="document.getElementById('ajaxAlert').style.display='none!important'"></button>
 </div>
 
 <!-- Filters Panel -->
@@ -99,12 +117,16 @@
                                 <i class="fa-solid fa-eye text-dark"></i>
                             </a>
                             {% if session.get('role') in ['Admin', 'Faculty'] %}
-                            <button type="button" class="btn btn-sm btn-outline-primary py-1" data-bs-toggle="modal" data-bs-target="#editModal-{{ student.id }}" title="Edit Details">
+                            <button type="button" class="btn btn-sm btn-outline-primary py-1"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#editModal-{{ student.id }}"
+                                    title="Edit Details">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                             {% endif %}
                             {% if session.get('role') == 'Admin' %}
-                            <form action="{{ url_for('student.delete_student', id=student.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete student {{ student.name }}? This will clear all historical logs.');">
+                            <form action="{{ url_for('student.delete_student', id=student.id) }}" method="POST"
+                                  onsubmit="return confirm('Are you sure you want to delete student {{ student.name }}? This will clear all historical logs.');">
                                 <button type="submit" class="btn btn-sm btn-outline-danger py-1" title="Delete Student">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </button>
@@ -113,93 +135,6 @@
                         </div>
                     </td>
                 </tr>
-
-                <!-- Edit Student Modal for this student -->
-                {% if session.get('role') in ['Admin', 'Faculty'] %}
-                <div class="modal fade" id="editModal-{{ student.id }}" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-lg text-dark">
-                        <div class="modal-content">
-                            <div class="modal-header bg-dark text-white">
-                                <h5 class="modal-title">Edit Record: {{ student.name }} ({{ student.student_id }})</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                            </div>
-                            <form action="{{ url_for('student.edit_student', id=student.id) }}" method="POST" class="custom-form p-4">
-                                <div class="row g-3">
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Full Name</label>
-                                        <input type="text" name="name" class="form-control" value="{{ student.name }}" required>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Email Address</label>
-                                        <input type="email" name="email" class="form-control" value="{{ student.email }}" required>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Contact Phone</label>
-                                        <input type="text" name="phone" class="form-control" value="{{ student.phone }}" required>
-                                    </div>
-                                    <div class="col-md-3 mb-2">
-                                        <label class="form-label">Gender</label>
-                                        <select name="gender" class="form-select" required>
-                                            <option value="Male" {% if student.gender == 'Male' %}selected{% endif %}>Male</option>
-                                            <option value="Female" {% if student.gender == 'Female' %}selected{% endif %}>Female</option>
-                                            <option value="Other" {% if student.gender == 'Other' %}selected{% endif %}>Other</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3 mb-2">
-                                        <label class="form-label">Semester</label>
-                                        <select name="semester" class="form-select" required>
-                                            {% for sem in range(1, 9) %}
-                                            <option value="{{ sem }}" {% if student.semester == sem %}selected{% endif %}>Semester {{ sem }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Department</label>
-                                        <select name="department_id" class="form-select" required>
-                                            {% for dept in departments %}
-                                            <option value="{{ dept.id }}" {% if student.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    
-                                    <hr class="my-3">
-                                    <h6 class="mb-0 fw-bold" style="color: #D4AF37 !important;"><i class="fa-solid fa-chart-line me-2"></i>Performance Indicators</h6>
-                                    
-                                    <div class="col-md-3 mb-2">
-                                        <label class="form-label">Current GPA (0-10)</label>
-                                        <input type="number" step="0.01" min="0" max="10" name="current_gpa" class="form-control" value="{{ student.current_gpa }}" required>
-                                    </div>
-                                    <div class="col-md-3 mb-2">
-                                        <label class="form-label">Active Backlogs</label>
-                                        <input type="number" min="0" max="20" name="backlogs" class="form-control" value="{{ student.backlogs }}" required>
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label class="form-label">Outstanding Fees (Rs.)</label>
-                                        <input type="number" step="1" min="0" name="fee_due" class="form-control" value="{{ student.fee_due }}" required>
-                                    </div>
-                                    <div class="col-md-4 mb-2">
-                                        <label class="form-label">Attendance Rate %</label>
-                                        <input type="number" step="0.1" min="0" max="100" name="attendance_rate" class="form-control" value="{{ student.attendance_rate }}" required>
-                                    </div>
-                                    <div class="col-md-4 mb-2">
-                                        <label class="form-label">Assignment Rate %</label>
-                                        <input type="number" step="0.1" min="0" max="100" name="assignment_rate" class="form-control" value="{{ student.assignment_rate }}" required>
-                                    </div>
-                                    <div class="col-md-4 mb-2">
-                                        <label class="form-label">Lab Score %</label>
-                                        <input type="number" step="0.1" min="0" max="100" name="lab_marks" class="form-control" value="{{ student.lab_marks }}" required>
-                                    </div>
-                                </div>
-                                <div class="text-end mt-4">
-                                    <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Close</button>
-                                    <button type="submit" class="btn btn-gold btn-sm">Save Changes</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
                 {% else %}
                 <tr>
                     <td colspan="10" class="text-center py-4 text-muted">No students registered in directory database.</td>
@@ -210,36 +145,140 @@
     </div>
 </div>
 
-<!-- Add Student Modal -->
+<!-- =====================================================================
+     EDIT MODALS — placed OUTSIDE the table (fixes invalid HTML / z-index freeze)
+     ===================================================================== -->
+{% for student in students %}
 {% if session.get('role') in ['Admin', 'Faculty'] %}
-<div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+<div class="modal fade" id="editModal-{{ student.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg text-dark">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="addModalLabel">Register New Student Profile</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Edit Record: {{ student.name }} ({{ student.student_id }})</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form action="{{ url_for('student.add_student') }}" method="POST" class="custom-form p-4">
+            <form action="{{ url_for('student.edit_student', id=student.id) }}" method="POST" class="custom-form p-4">
                 <div class="row g-3">
-                    <div class="col-md-4 mb-2">
-                        <label class="form-label">Student Roll ID (Unique)</label>
-                        <input type="text" name="student_id" class="form-control" placeholder="e.g. CSE-2026-004" required>
-                    </div>
-                    <div class="col-md-8 mb-2">
+                    <div class="col-md-6 mb-2">
                         <label class="form-label">Full Name</label>
-                        <input type="text" name="name" class="form-control" placeholder="Enter student's full name" required>
+                        <input type="text" name="name" class="form-control" value="{{ student.name }}" required>
                     </div>
                     <div class="col-md-6 mb-2">
                         <label class="form-label">Email Address</label>
-                        <input type="email" name="email" class="form-control" placeholder="e.g. name@college.edu" required>
+                        <input type="email" name="email" class="form-control" value="{{ student.email }}" required>
                     </div>
                     <div class="col-md-6 mb-2">
                         <label class="form-label">Contact Phone</label>
-                        <input type="text" name="phone" class="form-control" placeholder="e.g. +91 9988776655" required>
+                        <input type="text" name="phone" class="form-control" value="{{ student.phone }}" required>
                     </div>
                     <div class="col-md-3 mb-2">
                         <label class="form-label">Gender</label>
                         <select name="gender" class="form-select" required>
+                            <option value="Male" {% if student.gender == 'Male' %}selected{% endif %}>Male</option>
+                            <option value="Female" {% if student.gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if student.gender == 'Other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Semester</label>
+                        <select name="semester" class="form-select" required>
+                            {% for sem in range(1, 9) %}
+                            <option value="{{ sem }}" {% if student.semester == sem %}selected{% endif %}>Semester {{ sem }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Department</label>
+                        <select name="department_id" class="form-select" required>
+                            {% for dept in departments %}
+                            <option value="{{ dept.id }}" {% if student.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <hr class="my-3">
+                    <h6 class="mb-0 fw-bold" style="color: #D4AF37 !important;"><i class="fa-solid fa-chart-line me-2"></i>Performance Indicators</h6>
+
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Current GPA (0-10)</label>
+                        <input type="number" step="0.01" min="0" max="10" name="current_gpa" class="form-control" value="{{ student.current_gpa }}" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Previous GPA (0-10)</label>
+                        <input type="number" step="0.01" min="0" max="10" name="prev_gpa" class="form-control" value="{{ student.prev_gpa or student.current_gpa }}" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Active Backlogs</label>
+                        <input type="number" min="0" max="20" name="backlogs" class="form-control" value="{{ student.backlogs }}" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Outstanding Fees (Rs.)</label>
+                        <input type="number" step="1" min="0" name="fee_due" class="form-control" value="{{ student.fee_due }}" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Attendance Rate %</label>
+                        <input type="number" step="0.1" min="0" max="100" name="attendance_rate" class="form-control" value="{{ student.attendance_rate }}" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Assignment Rate %</label>
+                        <input type="number" step="0.1" min="0" max="100" name="assignment_rate" class="form-control" value="{{ student.assignment_rate }}" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Lab Score %</label>
+                        <input type="number" step="0.1" min="0" max="100" name="lab_marks" class="form-control" value="{{ student.lab_marks }}" required>
+                    </div>
+                </div>
+                <div class="text-end mt-4">
+                    <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-gold btn-sm">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- =====================================================================
+     ADD STUDENT MODAL — uses AJAX to prevent page freeze on submission
+     ===================================================================== -->
+{% if session.get('role') in ['Admin', 'Faculty'] %}
+<div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="addModalLabel">Register New Student Profile</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" id="addModalCloseX"></button>
+            </div>
+
+            <!-- Inline feedback inside modal -->
+            <div id="modalAlert" class="mx-4 mt-3" style="display:none;"></div>
+
+            <form id="addStudentForm" class="custom-form p-4" novalidate>
+                <div class="row g-3">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label">Student Roll ID <span class="text-danger">*</span></label>
+                        <input type="text" name="student_id" id="f_student_id" class="form-control" placeholder="e.g. CSE-2026-004" required>
+                        <div class="invalid-feedback">Roll ID is required.</div>
+                    </div>
+                    <div class="col-md-8 mb-2">
+                        <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                        <input type="text" name="name" id="f_name" class="form-control" placeholder="Enter student's full name" required>
+                        <div class="invalid-feedback">Name is required.</div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                        <input type="email" name="email" id="f_email" class="form-control" placeholder="e.g. name@college.edu" required>
+                        <div class="invalid-feedback">Valid email is required.</div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Contact Phone <span class="text-danger">*</span></label>
+                        <input type="text" name="phone" id="f_phone" class="form-control" placeholder="e.g. +91 9988776655" required>
+                        <div class="invalid-feedback">Phone is required.</div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Gender</label>
+                        <select name="gender" id="f_gender" class="form-select" required>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                             <option value="Other">Other</option>
@@ -247,7 +286,7 @@
                     </div>
                     <div class="col-md-3 mb-2">
                         <label class="form-label">Semester</label>
-                        <select name="semester" class="form-select" required>
+                        <select name="semester" id="f_semester" class="form-select" required>
                             {% for sem in range(1, 9) %}
                             <option value="{{ sem }}">Semester {{ sem }}</option>
                             {% endfor %}
@@ -255,44 +294,56 @@
                     </div>
                     <div class="col-md-6 mb-2">
                         <label class="form-label">Academic Department</label>
-                        <select name="department_id" class="form-select" required>
+                        <select name="department_id" id="f_department_id" class="form-select" required>
                             {% for dept in departments %}
                             <option value="{{ dept.id }}">{{ dept.name }} ({{ dept.code }})</option>
                             {% endfor %}
                         </select>
                     </div>
 
-                    <hr class="my-3">
-                    <h6 class="mb-0 fw-bold" style="color: #D4AF37 !important;"><i class="fa-solid fa-chart-line me-2"></i>Performance Indicators</h6>
-                    
+                    <div class="col-12"><hr class="my-2"></div>
+                    <div class="col-12">
+                        <h6 class="mb-2 fw-bold" style="color: #D4AF37 !important;"><i class="fa-solid fa-chart-line me-2"></i>Performance Indicators</h6>
+                    </div>
+
                     <div class="col-md-3 mb-2">
                         <label class="form-label">Current GPA (0-10)</label>
-                        <input type="number" step="0.01" min="0" max="10" name="current_gpa" class="form-control" placeholder="e.g. 7.8" required>
+                        <input type="number" step="0.01" min="0" max="10" name="current_gpa" id="f_current_gpa" class="form-control" placeholder="e.g. 7.8" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Previous GPA (0-10)</label>
+                        <input type="number" step="0.01" min="0" max="10" name="prev_gpa" id="f_prev_gpa" class="form-control" placeholder="e.g. 7.5" value="0.0" required>
                     </div>
                     <div class="col-md-3 mb-2">
                         <label class="form-label">Active Backlogs</label>
-                        <input type="number" min="0" max="20" name="backlogs" class="form-control" value="0" required>
+                        <input type="number" min="0" max="20" name="backlogs" id="f_backlogs" class="form-control" value="0" required>
                     </div>
-                    <div class="col-md-6 mb-2">
+                    <div class="col-md-3 mb-2">
                         <label class="form-label">Outstanding Fees (Rs.)</label>
-                        <input type="number" step="1" min="0" name="fee_due" class="form-control" value="0" required>
+                        <input type="number" step="1" min="0" name="fee_due" id="f_fee_due" class="form-control" value="0" required>
                     </div>
                     <div class="col-md-4 mb-2">
                         <label class="form-label">Attendance Rate %</label>
-                        <input type="number" step="0.1" min="0" max="100" name="attendance_rate" class="form-control" value="95.0" required>
+                        <input type="number" step="0.1" min="0" max="100" name="attendance_rate" id="f_attendance_rate" class="form-control" value="95.0" required>
                     </div>
                     <div class="col-md-4 mb-2">
                         <label class="form-label">Assignment Rate %</label>
-                        <input type="number" step="0.1" min="0" max="100" name="assignment_rate" class="form-control" value="95.0" required>
+                        <input type="number" step="0.1" min="0" max="100" name="assignment_rate" id="f_assignment_rate" class="form-control" value="95.0" required>
                     </div>
                     <div class="col-md-4 mb-2">
                         <label class="form-label">Lab Score %</label>
-                        <input type="number" step="0.1" min="0" max="100" name="lab_marks" class="form-control" value="90.0" required>
+                        <input type="number" step="0.1" min="0" max="100" name="lab_marks" id="f_lab_marks" class="form-control" value="90.0" required>
                     </div>
                 </div>
-                <div class="text-end mt-4">
-                    <button type="button" class="btn btn-secondary btn-sm me-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-gold btn-sm">Add Student</button>
+
+                <div class="text-end mt-4 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" id="addModalCancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-gold btn-sm" id="addStudentSubmitBtn">
+                        <span id="addBtnText"><i class="fa-solid fa-user-plus me-2"></i>Add Student</span>
+                        <span id="addBtnSpinner" style="display:none;">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>Saving...
+                        </span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -300,4 +351,119 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function showModalAlert(type, message) {
+        const el = document.getElementById('modalAlert');
+        if (!el) return;
+        el.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert" style="border-radius:10px;">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+        el.style.display = 'block';
+    }
+
+    function hideModalAlert() {
+        const el = document.getElementById('modalAlert');
+        if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    }
+
+    function setSubmitLoading(isLoading) {
+        const btn  = document.getElementById('addStudentSubmitBtn');
+        const txt  = document.getElementById('addBtnText');
+        const spin = document.getElementById('addBtnSpinner');
+        if (!btn) return;
+        btn.disabled   = isLoading;
+        txt.style.display  = isLoading ? 'none'   : 'inline';
+        spin.style.display = isLoading ? 'inline' : 'none';
+    }
+
+    // ── Add Student AJAX Submit ────────────────────────────────────────────
+    const addForm = document.getElementById('addStudentForm');
+    if (addForm) {
+        addForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            hideModalAlert();
+
+            // HTML5 constraint validation
+            if (!addForm.checkValidity()) {
+                addForm.classList.add('was-validated');
+                showModalAlert('warning', '<i class="fa-solid fa-triangle-exclamation me-2"></i>Please fill in all required fields correctly.');
+                return;
+            }
+
+            setSubmitLoading(true);
+
+            const formData = new FormData(addForm);
+
+            fetch('{{ url_for("student.add_student_api") }}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                setSubmitLoading(false);
+                if (result.ok && result.data.success) {
+                    // Success: show message, reset form, close after delay
+                    showModalAlert('success',
+                        '<i class="fa-solid fa-circle-check me-2"></i>' + result.data.message);
+                    addForm.reset();
+                    addForm.classList.remove('was-validated');
+                    setTimeout(function () {
+                        // Close modal and reload page to show new student
+                        const modalEl = document.getElementById('addStudentModal');
+                        const modal   = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+                        window.location.reload();
+                    }, 1800);
+                } else {
+                    showModalAlert('danger',
+                        '<i class="fa-solid fa-circle-xmark me-2"></i>' + (result.data.message || 'Failed to add student.'));
+                }
+            })
+            .catch(function (err) {
+                setSubmitLoading(false);
+                showModalAlert('danger',
+                    '<i class="fa-solid fa-circle-xmark me-2"></i>Network error. Please try again.');
+                console.error('Add student error:', err);
+            });
+        });
+    }
+
+    // ── Reset modal state when it's closed ────────────────────────────────
+    const addModalEl = document.getElementById('addStudentModal');
+    if (addModalEl) {
+        addModalEl.addEventListener('hidden.bs.modal', function () {
+            if (addForm) {
+                addForm.reset();
+                addForm.classList.remove('was-validated');
+            }
+            setSubmitLoading(false);
+            hideModalAlert();
+        });
+    }
+
+    // ── Fix: ensure Bootstrap modals don't conflict with fixed sidebar ─────
+    // Move all modals to body level so z-index stacking works correctly
+    document.querySelectorAll('.modal').forEach(function (modal) {
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    });
+
+})();
+</script>
 {% endblock %}

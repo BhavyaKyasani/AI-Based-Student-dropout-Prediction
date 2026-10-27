@@ -164,6 +164,132 @@ def add_student():
         
     return redirect(url_for('student.list_students'))
 
+
+@student_bp.route('/api/students/add', methods=['POST'])
+@login_required
+@role_required('Admin', 'Faculty')
+def add_student_api():
+    """JSON endpoint for AJAX-based student registration from the modal form."""
+    try:
+        student_id      = request.form.get('student_id', '').strip()
+        name            = request.form.get('name', '').strip()
+        email           = request.form.get('email', '').strip()
+        phone           = request.form.get('phone', '').strip()
+        gender          = request.form.get('gender', 'Male')
+        department_id   = int(request.form.get('department_id', 0))
+        semester        = int(request.form.get('semester', 1))
+
+        current_gpa     = float(request.form.get('current_gpa', 0.0))
+        prev_gpa        = float(request.form.get('prev_gpa', 0.0))
+        attendance_rate = float(request.form.get('attendance_rate', 95.0))
+        backlogs        = int(request.form.get('backlogs', 0))
+        fee_due         = float(request.form.get('fee_due', 0.0))
+        assignment_rate = float(request.form.get('assignment_rate', 100.0))
+        lab_marks       = float(request.form.get('lab_marks', 100.0))
+
+        # ── Validations ────────────────────────────────────────────────────
+        if not student_id:
+            return jsonify({'success': False, 'message': 'Student Roll ID is required.'}), 400
+        if not name:
+            return jsonify({'success': False, 'message': 'Full Name is required.'}), 400
+        if not email:
+            return jsonify({'success': False, 'message': 'Email address is required.'}), 400
+
+        if Student.query.filter_by(student_id=student_id).first():
+            return jsonify({'success': False, 'message': f'Roll ID "{student_id}" already exists.'}), 400
+
+        if Student.query.filter_by(email=email).first():
+            return jsonify({'success': False, 'message': f'Email "{email}" is already registered.'}), 400
+
+        if not (0.0 <= current_gpa <= 10.0):
+            return jsonify({'success': False, 'message': 'Current GPA must be between 0 and 10.'}), 400
+
+        if not (0.0 <= prev_gpa <= 10.0):
+            return jsonify({'success': False, 'message': 'Previous GPA must be between 0 and 10.'}), 400
+
+        if not (0.0 <= assignment_rate <= 100.0):
+            return jsonify({'success': False, 'message': 'Assignment rate must be between 0 and 100.'}), 400
+
+        if not (0.0 <= lab_marks <= 100.0):
+            return jsonify({'success': False, 'message': 'Lab score must be between 0 and 100.'}), 400
+
+        if phone:
+            clean_phone = phone.replace('+', '').replace('-', '').replace(' ', '')
+            if not clean_phone.isdigit() or len(clean_phone) < 8:
+                return jsonify({'success': False, 'message': 'Phone number is invalid.'}), 400
+
+        # ── Create student ─────────────────────────────────────────────────
+        student = Student(
+            student_id=student_id,
+            name=name,
+            email=email,
+            phone=phone,
+            gender=gender,
+            department_id=department_id,
+            semester=semester,
+            current_gpa=current_gpa,
+            prev_gpa=prev_gpa,
+            attendance_rate=attendance_rate,
+            backlogs=backlogs,
+            fee_due=fee_due,
+            assignment_rate=assignment_rate,
+            lab_marks=lab_marks
+        )
+        db.session.add(student)
+        db.session.flush()  # populate student.id
+
+        # Default fee record
+        fee = Fees(
+            student_id=student.id,
+            total_fee=150000.0,
+            paid_amount=150000.0 - fee_due,
+            due_amount=fee_due,
+            payment_status='Paid' if fee_due == 0 else ('Unpaid' if fee_due >= 150000.0 else 'Partial'),
+            due_date=datetime.utcnow()
+        )
+        db.session.add(fee)
+
+        # Run AI prediction immediately
+        from ml_model.predict import predict_student_risk
+        from models import process_student_risk_updates
+
+        features = {
+            'current_gpa': current_gpa,
+            'prev_gpa': prev_gpa,
+            'attendance_rate': attendance_rate,
+            'backlogs': backlogs,
+            'fee_due': fee_due,
+            'assignment_rate': assignment_rate,
+            'lab_marks': lab_marks,
+            'semester': semester,
+            'gpa_trend': current_gpa - prev_gpa,
+            'counseling_count': 0
+        }
+        pred_res = predict_student_risk(features)
+        process_student_risk_updates(student, pred_res)
+
+        # Audit log
+        audit = AuditLog(
+            user_id=session.get('user_id'),
+            action="Add Student",
+            target_table="students",
+            details=f"Added student {name} ({student_id}) — {pred_res['risk_level']} risk.",
+            ip_address=request.remote_addr
+        )
+        db.session.add(audit)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'✅ Student <strong>{name}</strong> registered successfully! '
+                       f'AI Prediction: <strong>{pred_res["risk_level"]} Risk</strong>.'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
+
+
 @student_bp.route('/students/edit/<int:id>', methods=['POST'])
 @login_required
 @role_required('Admin', 'Faculty')
